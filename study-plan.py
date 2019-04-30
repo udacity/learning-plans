@@ -1,6 +1,8 @@
 # coding: utf-8
+import argparse
 import datetime
 import numpy as np
+import os
 import pandas as pd
 
 
@@ -138,25 +140,50 @@ def compact_date_ranges(timeline):
                 lessons_.append(lessons[i])
                 date_ranges.append(dates[i])
                 i += 1
+        else:
+            break
                 
     return pd.DataFrame({'Dates':date_ranges, 'Lessons':lessons_})
+
+
+def valid_date(s):
+    try:
+        return datetime.datetime.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        msg = "Not a valid date: '{0}'.".format(s)
+        raise argparse.ArgumentTypeError(msg)
                 
 
 
 def run():
-    data = pd.read_csv('da.csv', header=None)
+    parser = argparse.ArgumentParser('study-plan.py')
+    parser.add_argument('--plan',type=str, help='Path to input CSV file.')
+    parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD.")
+    parser.add_argument('--daily',type=float, nargs='*', help=("Either a single " 
+    "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment."))
+    
+    args = parser.parse_args()
+    
+    data = pd.read_csv(args.plan, header=None)
     time_requirements = list(map(parse_time, data.iloc[:,2]))
 
-    daily_commitment = 4
+    daily_commitment = args.daily
+    assert len(daily_commitment) == 1 or len(daily_commitment) == 7, ("Parameter --daily must be either a single " 
+    "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment.")
     hours_required = to_hours(time_requirements, daily_commitment)
-    start_date = datetime.date(2018,9,11)
-    
+    start_date = args.start
+
+       
     timeline = build_timeline(data, hours_required, daily_commitment, start_date)
     d2l = date_to_lessons(timeline)
     
     output = compact_date_ranges(d2l)
-    print(output)
-
+    #print(output)
+    dir = os.path.dirname(os.path.abspath(args.plan))
+    filename = os.path.basename(args.plan).split('.')[0]
+    out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
+    output.to_csv(out_path, sep=',', index=False)
+    print(f'File {out_path} written.')
 
 
 if __name__ == '__main__':

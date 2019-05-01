@@ -6,6 +6,10 @@ import os
 import pandas as pd
 
 
+class Config():
+    week2days = 7
+    mins2hours = 1.0/60.0
+    time_format = "%Y-%m-%d:%z"
 
 def parse_time(time_required:str):
 
@@ -36,47 +40,54 @@ def parse_time(time_required:str):
     return time_spec 
 
 
-def to_hours(time_needed, daily_commitment):
-    commitment_hours = [0]*len(time_needed)
+def to_hours(time_needed, expected_weekly_hours):
+    hours_required = [0]*len(time_needed)
     for i in range(len(time_needed)):
-        commitment_hours[i] = time_needed[i]['weeks'] * 7 * daily_commitment +\
-                              time_needed[i]['days'] * daily_commitment +\
-                              time_needed[i]['hours'] +\
-                              time_needed[i]['mins']/60
-    return commitment_hours
+        hours_required[i] = time_needed[i]['weeks'] * expected_weekly_hours +\
+                            time_needed[i]['days']  * expected_weekly_hours/week2days +\
+                            time_needed[i]['hours'] +\
+                            time_needed[i]['mins']  * mins2hours
+    return hours_required
         
 
 
 
-def build_timeline(data, hours_required, daily_commitment, start_date):
+def build_timeline(data, lesson_duration, commitment_by_day, start_date):
+    start_weekday = start_date.weekday()
+    while not commitment_by_day[start_weekday] > 0:
+        start_weekday = (start_weekday+1) % Config.week2days
+        start_date += 1
+    
+    
+
     lesson_timeline = []
     day_counter = 0
-    cumulative_commit = 0
+    cumulative_commitment = 0
 
-    for lesson_id in range(len(hours_required)):
+    for lesson_id in range(len(lesson_duration)):
         ## Tackle lessons with duration less than one commitment-day.
-        if hours_required[lesson_id] < daily_commitment:
+        if lesson_duration[lesson_id] < commitment_by_day[start_weekday]:
             start_day_offset = day_counter
-            spillover = cumulative_commit + hours_required[lesson_id] - daily_commitment
+            spillover = cumulative_commitment + lesson_duration[lesson_id] - commitment_by_day
 
             if spillover > 0:
                 end_day_offset = start_day_offset + 1
-                cumulative_commit = cumulative_commit + hours_required[lesson_id] - daily_commitment
+                cumulative_commitment = cumulative_commitment + lesson_duration[lesson_id] - commitment_by_day
                 day_counter += 1
             else:
                 end_day_offset = start_day_offset
-                cumulative_commit = cumulative_commit + hours_required[lesson_id]
+                cumulative_commitment = cumulative_commitment + lesson_duration[lesson_id]
 
         ## Tackle lessons with duration exceeding one commitment-day
         else:
             ## If we have non-zero accumulated commitment-hours, skip the day
-            if cumulative_commit > 0:
-                cumulative_commit = 0
+            if cumulative_commitment > 0:
+                cumulative_commitment = 0
                 day_counter += 1
 
             start_day_offset = day_counter
             ## Round up commitment-days
-            end_day_offset   = start_day_offset + int(np.ceil(hours_required[lesson_id] / daily_commitment)) - 1
+            end_day_offset   = start_day_offset + int(np.ceil(lesson_duration[lesson_id] / commitment_by_day)) - 1
 
             ## Ensure next lesson starts on next day.
             day_counter += end_day_offset-start_day_offset+1
@@ -148,39 +159,53 @@ def compact_date_ranges(timeline):
 
 def valid_date(s):
     try:
-        return datetime.datetime.strptime(s, "%Y-%m-%d")
+        date = datetime.datetime.strptime(s, Config.time_format)
     except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
+        msg = f"'{s}' is not a valid date in yyyy-mm-dd:hh:mm format."
         raise argparse.ArgumentTypeError(msg)
+    return date
                 
 
 
 def run():
     parser = argparse.ArgumentParser('study-plan.py')
-    parser.add_argument('--plan',type=str, help='Path to input CSV file.')
-    parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD.")
-    parser.add_argument('--daily',type=float, nargs='*', help=("Either a single " 
+    parser.add_argument('--duration',type=str, help='Path to CSV file containing lesson-wise durations.')
+    parser.add_argument('--expected',type=float, help='Expected commitment in hours per week.')
+    parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD:<UTC Offset as +/-hh:mm>.")
+    parser.add_argument('--daily',type=float, nargs='+', help=("Either a single " 
     "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment."))
     
     args = parser.parse_args()
+    duration = args.duration
+    expected_weekly_hours = args.expected
+    start_date = args.start
+    daily_commitment = args.daily
     
-    data = pd.read_csv(args.plan, header=None)
+    # Read in the duration data and parse time field. 
+    data = pd.read_csv(duration, header=None)
     time_requirements = list(map(parse_time, data.iloc[:,2]))
 
-    daily_commitment = args.daily
+    # Sanity check learner's daily commitment.
     assert len(daily_commitment) == 1 or len(daily_commitment) == 7, ("Parameter --daily must be either a single " 
     "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment.")
-    hours_required = to_hours(time_requirements, daily_commitment)
-    start_date = args.start
 
-       
-    timeline = build_timeline(data, hours_required, daily_commitment, start_date)
+    # Expand short-form. 
+    if len(daily_commitment) == 1:
+        daily_commitment = daily_commitment * week2days
+
+    
+    lesson_durations = to_hours(time_requirements, expected_weekly_hours)
+          
+    timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
+    
     d2l = date_to_lessons(timeline)
     
     output = compact_date_ranges(d2l)
     #print(output)
-    dir = os.path.dirname(os.path.abspath(args.plan))
-    filename = os.path.basename(args.plan).split('.')[0]
+    
+    os.mkdir('./plans')
+    dir = os.path.dirname(os.path.abspath(duration))
+    filename = os.path.basename(duration).split('.')[0]
     out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
     output.to_csv(out_path, sep=',', index=False)
     print(f'File {out_path} written.')

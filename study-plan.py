@@ -1,4 +1,5 @@
 # coding: utf-8
+from collections import deque
 import argparse
 import datetime
 import numpy as np
@@ -44,98 +45,61 @@ def to_hours(time_needed, expected_weekly_hours):
     hours_required = [0]*len(time_needed)
     for i in range(len(time_needed)):
         hours_required[i] = time_needed[i]['weeks'] * expected_weekly_hours +\
-                            time_needed[i]['days']  * expected_weekly_hours/week2days +\
+                            time_needed[i]['days']  * expected_weekly_hours/Config.week2days +\
                             time_needed[i]['hours'] +\
-                            time_needed[i]['mins']  * mins2hours
+                            time_needed[i]['mins']  * Config.mins2hours
     return hours_required
         
 
 
 
-def build_timeline(data, lesson_duration, commitment_by_day, start_date):
-    start_weekday = start_date.weekday()
-    while not commitment_by_day[start_weekday] > 0:
-        start_weekday = (start_weekday+1) % Config.week2days
-        start_date += 1
-    
-    
+def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=0.25):
+    nb_lesson = len(lesson_duration)
+
+    weekday = start_date.weekday()
+
+    commitment_info = {'date':start_date, 'nb_hours':commitment_by_day[weekday]}
+    lesson_info = {'id':0, 'nb_hours':lesson_duration[0]}
 
     lesson_timeline = []
-    day_counter = 0
-    cumulative_commitment = 0
 
-    for lesson_id in range(len(lesson_duration)):
-        ## Tackle lessons with duration less than one commitment-day.
-        if lesson_duration[lesson_id] < commitment_by_day[start_weekday]:
-            start_day_offset = day_counter
-            spillover = cumulative_commitment + lesson_duration[lesson_id] - commitment_by_day
+    def __incr_lesson__():
+        lesson_info['id'] += 1
+        lesson_info['nb_hours'] = lesson_duration[lesson_info['id']]\
+            if lesson_info['id'] < nb_lesson else None
 
-            if spillover > 0:
-                end_day_offset = start_day_offset + 1
-                cumulative_commitment = cumulative_commitment + lesson_duration[lesson_id] - commitment_by_day
-                day_counter += 1
-            else:
-                end_day_offset = start_day_offset
-                cumulative_commitment = cumulative_commitment + lesson_duration[lesson_id]
+    def __incr_day__():
+        commitment_info['date'] = commitment_info['date'] + datetime.timedelta(days=1)
+        commitment_info['nb_hours'] = commitment_by_day[commitment_info['date'].weekday()]
 
-        ## Tackle lessons with duration exceeding one commitment-day
+
+    while lesson_info['id'] < nb_lesson:
+        commitment_offered = commitment_info['nb_hours']
+        commitment_required = lesson_info['nb_hours']
+
+        if commitment_offered == 0 or commitment_required < margin:
+            __incr_day__()
+
         else:
-            ## If we have non-zero accumulated commitment-hours, skip the day
-            if cumulative_commitment > 0:
-                cumulative_commitment = 0
-                day_counter += 1
+            if commitment_offered >= commitment_required:
+                lesson_timeline.append((commitment_info['date'], data.Lesson[lesson_info['id']]))
+                __incr_lesson__()
+                commitment_info['nb_hours'] = commitment_offered - commitment_required
 
-            start_day_offset = day_counter
-            ## Round up commitment-days
-            end_day_offset   = start_day_offset + int(np.ceil(lesson_duration[lesson_id] / commitment_by_day)) - 1
-
-            ## Ensure next lesson starts on next day.
-            day_counter += end_day_offset-start_day_offset+1
-
-
-        ## Install day info for current lesson.
-        start_absolute_date = (start_date+datetime.timedelta(days=start_day_offset)).strftime('%b %d %Y')
-        end_absolute_date   = (start_date+datetime.timedelta(days=end_day_offset)).strftime('%b %d %Y')
-        lesson_timeline.append((data.iloc[lesson_id,1], start_absolute_date, end_absolute_date))
-
-    return lesson_timeline
-    
-    
-
-
-def date_to_lessons(timeline):
-    mapping = dict()
-    for i in range(len(timeline)):
-        lesson, start_date, end_date = timeline[i]
-        if mapping.get(start_date):
-            mapping[start_date].append(lesson)
-        else:
-            mapping[start_date] = [lesson]
-            
-        if end_date != start_date:
-            if mapping.get(end_date):
-                mapping[end_date].append(lesson)
             else:
-                mapping[end_date] = [lesson]
-    
-    ## Convert list of lessons to comma separated elements in a string
-    dates = []
-    lessons = []
-    for key in mapping:
-        dates.append(key)
-        lessons.append(', '.join(mapping[key]).rstrip())
-    
-    date2lesson = pd.DataFrame({'Date':dates, 'Lesson':lessons})
-    date2lesson.Date = pd.to_datetime(date2lesson.Date)
-    date2lesson.sort_values('Date', inplace=True)
-    date2lesson.Date = date2lesson.Date.dt.strftime('%b %d %Y')
-    return date2lesson
+                lesson_timeline.append((commitment_info['date'], data.Lesson[lesson_info['id']]))
+                __incr_day__()
+                lesson_info['nb_hours'] = commitment_required - commitment_offered
+
+
+    dates, lessons = zip(*lesson_timeline)
+    return pd.DataFrame(data={'Date':dates, 'Lessons':lessons})
 
 
 
 def compact_date_ranges(timeline):
     dates = timeline.Date
-    lessons = timeline.Lesson
+    lessons = timeline.Lessons
     
     date_ranges = []
     lessons_ = []
@@ -182,8 +146,8 @@ def run():
     daily_commitment = args.daily
     
     # Read in the duration data and parse time field. 
-    data = pd.read_csv(duration, header=None)
-    time_requirements = list(map(parse_time, data.iloc[:,2]))
+    data = pd.read_csv(duration, header=0)
+    time_requirements = list(map(parse_time, data.Duration))
 
     # Sanity check learner's daily commitment.
     assert len(daily_commitment) == 1 or len(daily_commitment) == 7, ("Parameter --daily must be either a single " 
@@ -191,24 +155,24 @@ def run():
 
     # Expand short-form. 
     if len(daily_commitment) == 1:
-        daily_commitment = daily_commitment * week2days
+        daily_commitment = daily_commitment * Config.week2days
 
     
     lesson_durations = to_hours(time_requirements, expected_weekly_hours)
           
     timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
     
-    d2l = date_to_lessons(timeline)
+    d2l = timeline #d2l = date_to_lessons(timeline)
     
-    output = compact_date_ranges(d2l)
-    #print(output)
+    #output = compact_date_ranges(d2l)
+    print(timeline)
     
-    os.mkdir('./plans')
-    dir = os.path.dirname(os.path.abspath(duration))
-    filename = os.path.basename(duration).split('.')[0]
-    out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
-    output.to_csv(out_path, sep=',', index=False)
-    print(f'File {out_path} written.')
+    # dir = './plans'
+    # os.mkdir(dir)
+    # filename = os.path.basename(duration).split('.')[0]
+    # out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
+    # output.to_csv(out_path, sep=',', index=False)
+    # print(f'File {out_path} written.')
 
 
 if __name__ == '__main__':

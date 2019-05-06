@@ -105,14 +105,10 @@ def compact_date_ranges(timeline):
 
         date_range = min_date + ' : ' + max_date if max_date != min_date else min_date
         return date_range
-        
 
 
     def __collapse_lessons__(data):
-        lessons = ', '.join(list(data.Lessons))
-        #date = data.Date[0]#.strftime(Config.output_time_format)
-
-        #return pd.DataFrame(data={'Date':[date], 'Lessons':[lessons]})
+        lessons = ':'.join(list(data.Lessons))
         return lessons
         
     timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
@@ -170,12 +166,14 @@ def run():
     output = compact_date_ranges(d2l)
     #print(output)
     
-    # dir = './plans'
-    # os.mkdir(dir)
-    # filename = os.path.basename(duration).split('.')[0]
-    # out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
-    # output.to_csv(out_path, sep=',', index=False)
-    # print(f'File {out_path} written.')
+    dir = './plans'
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+    
+    filename = os.path.basename(duration).split('.')[0]
+    out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
+    output.to_csv(out_path, sep=',', index=False)
+    print(f'File {out_path} written.')
 
 
 if __name__ == '__main__':

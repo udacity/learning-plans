@@ -28,7 +28,7 @@ def parse_time(time_required:str):
         
         assert time >=0, print('Invalid value for time',time) 
         
-        if unit in ['mins', 'minutes', 'minutes']:
+        if unit in ['mins', 'minute', 'minutes']:
             time_spec['mins'] += time
         elif unit in ['hour', 'hours']:
             time_spec['hours'] += time
@@ -98,23 +98,38 @@ def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=
 
 
 
-def compact_date_ranges(timeline):
+def compact_timeline(timeline):
     def __collapse_dates__(data):
-        min_date = data.Date.iloc[0]
-        max_date = data.Date.iloc[-1]
+        date_sub_group = [0] * len(data)
+        
+        for i in range(1,len(data)):
+            if (data.Date[i] - data.Date[i]).days <= 1:
+                date_sub_group[i] = date_sub_group[i-1]
+            else:
+                date_sub_group[i] = date_sub_group[i-1]+1 
 
-        date_range = min_date + ':' + max_date if max_date != min_date else min_date
-        return date_range
+        def __collate_dates__(data):
+            start_date = data.Date[0].strftime(Config.output_time_format)
+            end_date   = data.Date[-1].strftime(Config.output_time_format)
+            if end_date != start_date:
+                return start_date + ':' + end_date
+            else:
+                return start_date
+
+        date_ranges = data.groupby(date_sub_group).apply(__collate_dates__).reset_index(name='Date')
+        return date_ranges.Date
 
 
     def __collapse_lessons__(data):
         lessons = ', '.join(list(data.Lessons))
         return lessons
         
-    timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
-    tmp1 = timeline.groupby(timeline.Lessons).apply(__collapse_dates__).reset_index(name='Date')
+    #timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
+    tmp1 = timeline.groupby(timeline.Lessons).apply(__collapse_dates__).reset_index()
+    tmp1.columns = ['Lessons', 'Date']
+    #print(tmp1)
     tmp2 = tmp1.groupby(tmp1.Date).apply(__collapse_lessons__).reset_index(name='Lessons')
-    
+    print(tmp2)
     return tmp2
         
 
@@ -163,7 +178,7 @@ def run():
     
     d2l = timeline #d2l = date_to_lessons(timeline)
     
-    output = compact_date_ranges(d2l)
+    output = compact_timeline(d2l)
     #print(output)
     
     dir = './plans'

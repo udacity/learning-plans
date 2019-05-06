@@ -103,12 +103,12 @@ def compact_date_ranges(timeline):
         min_date = data.Date.iloc[0]
         max_date = data.Date.iloc[-1]
 
-        date_range = min_date + ' : ' + max_date if max_date != min_date else min_date
+        date_range = min_date + ':' + max_date if max_date != min_date else min_date
         return date_range
 
 
     def __collapse_lessons__(data):
-        lessons = ':'.join(list(data.Lessons))
+        lessons = ', '.join(list(data.Lessons))
         return lessons
         
     timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))

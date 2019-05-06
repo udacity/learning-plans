@@ -10,7 +10,8 @@ import pandas as pd
 class Config():
     week2days = 7
     mins2hours = 1.0/60.0
-    time_format = "%Y-%m-%d:%z"
+    input_time_format = "%Y-%m-%d:%z"
+    output_time_format = "%Y-%m-%d"
 
 def parse_time(time_required:str):
 
@@ -98,32 +99,34 @@ def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=
 
 
 def compact_date_ranges(timeline):
-    dates = timeline.Date
-    lessons = timeline.Lessons
+    def __collapse_dates__(data):
+        min_date = data.Date.iloc[0]
+        max_date = data.Date.iloc[-1]
+
+        date_range = min_date + ' : ' + max_date if max_date != min_date else min_date
+        return date_range
+        
+
+
+    def __collapse_lessons__(data):
+        lessons = ', '.join(list(data.Lessons))
+        #date = data.Date[0]#.strftime(Config.output_time_format)
+
+        #return pd.DataFrame(data={'Date':[date], 'Lessons':[lessons]})
+        return lessons
+        
+    timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
+    tmp1 = timeline.groupby(timeline.Lessons).apply(__collapse_dates__).reset_index(name='Date')
+    tmp2 = tmp1.groupby(tmp1.Date).apply(__collapse_lessons__).reset_index(name='Lessons')
     
-    date_ranges = []
-    lessons_ = []
-    
-    i = 0
-    while i < len(timeline):
-        if i+1 < len(timeline):
-            if lessons[i] == lessons[i+1]:
-                lessons_.append(lessons[i])
-                date_ranges.append('-'.join([dates[i],dates[i+1]]))
-                i += 2
-            else:
-                lessons_.append(lessons[i])
-                date_ranges.append(dates[i])
-                i += 1
-        else:
-            break
-                
-    return pd.DataFrame({'Dates':date_ranges, 'Lessons':lessons_})
+    return tmp2
+        
+
 
 
 def valid_date(s):
     try:
-        date = datetime.datetime.strptime(s, Config.time_format)
+        date = datetime.datetime.strptime(s, Config.input_time_format)
     except ValueError:
         msg = f"'{s}' is not a valid date in yyyy-mm-dd:hh:mm format."
         raise argparse.ArgumentTypeError(msg)
@@ -164,8 +167,8 @@ def run():
     
     d2l = timeline #d2l = date_to_lessons(timeline)
     
-    #output = compact_date_ranges(d2l)
-    print(timeline)
+    output = compact_date_ranges(d2l)
+    #print(output)
     
     # dir = './plans'
     # os.mkdir(dir)

@@ -130,13 +130,14 @@ def compact_timeline(timeline):
         lessons = ', '.join(list(data.Lessons))
         return lessons
         
-    #timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
-    tmp1 = timeline.groupby([timeline.Lessons]).apply(__collapse_dates__).reset_index(name='Date')
-    #tmp1.columns = ['Lessons', 'Date']
-    print(tmp1)
-    tmp2 = tmp1.groupby(tmp1.Date).apply(__collapse_lessons__).reset_index(name='Lessons')
-    #print(tmp2)
-    return tmp2
+    timeline_by_lessons = timeline.groupby(timeline.Lessons, sort=False)\
+                                  .apply(__collapse_dates__)\
+                                  .reset_index(name='Date')
+    
+    timeline_by_dates = timeline_by_lessons.groupby(timeline_by_lessons.Date)\
+                                           .apply(__collapse_lessons__)\
+                                           .reset_index(name='Lessons')
+    return timeline_by_dates
         
 
 
@@ -185,7 +186,7 @@ def run():
     d2l = timeline #d2l = date_to_lessons(timeline)
     
     output = compact_timeline(d2l)
-    #print(output)
+    print(output)
     
     dir = './plans'
     if not os.path.exists(dir):

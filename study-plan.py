@@ -1,5 +1,4 @@
 # coding: utf-8
-from collections import deque
 import argparse
 import datetime
 import numpy as np
@@ -99,37 +98,44 @@ def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=
 
 
 def compact_timeline(timeline):
-    def __collapse_dates__(data):
-        date_sub_group = [0] * len(data)
+    
+    def __collate_dates__(data):
+        '''Assing group IDs to sequential dates'''
+        date_group = [0] * len(data)
         
         for i in range(1,len(data)):
-            if (data.Date[i] - data.Date[i]).days <= 1:
-                date_sub_group[i] = date_sub_group[i-1]
+            if (data.Date[i] - data.Date[i-1]).days <= 1:
+                date_group[i] = date_group[i-1]
             else:
-                date_sub_group[i] = date_sub_group[i-1]+1 
+                date_group[i] = date_group[i-1]+1 
+        return date_group
 
-        def __collate_dates__(data):
-            start_date = data.Date[0].strftime(Config.output_time_format)
-            end_date   = data.Date[-1].strftime(Config.output_time_format)
-            if end_date != start_date:
-                return start_date + ':' + end_date
-            else:
-                return start_date
+    def __to_date_range__(data):
+        start_date = data.Date.iloc[0].strftime(Config.output_time_format)
+        end_date = data.Date.iloc[-1].strftime(Config.output_time_format)
+        if end_date != start_date:
+            return start_date + ':' + end_date
+        
+        return start_date
 
-        date_ranges = data.groupby(date_sub_group).apply(__collate_dates__).reset_index(name='Date')
-        return date_ranges.Date
+    def __collapse_dates__(data):
+        '''Convert sequential dates to a date range string.'''
+        date_groups = __collate_dates__(data) 
+        out = data.groupby(date_groups).apply(__to_date_range__)
 
+        return out
 
     def __collapse_lessons__(data):
+        '''Convert 1 or more lesson name strings to a list of lesson names'''
         lessons = ', '.join(list(data.Lessons))
         return lessons
         
     #timeline.Date = timeline.Date.apply(lambda date: date.strftime(Config.output_time_format))
-    tmp1 = timeline.groupby(timeline.Lessons).apply(__collapse_dates__).reset_index()
-    tmp1.columns = ['Lessons', 'Date']
-    #print(tmp1)
+    tmp1 = timeline.groupby([timeline.Lessons]).apply(__collapse_dates__).reset_index(name='Date')
+    #tmp1.columns = ['Lessons', 'Date']
+    print(tmp1)
     tmp2 = tmp1.groupby(tmp1.Date).apply(__collapse_lessons__).reset_index(name='Lessons')
-    print(tmp2)
+    #print(tmp2)
     return tmp2
         
 

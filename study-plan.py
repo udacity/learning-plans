@@ -77,7 +77,7 @@ def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=
         commitment_offered = commitment_info['nb_hours']
         commitment_required = lesson_info['nb_hours']
 
-        if commitment_offered == 0 or commitment_required < margin:
+        if commitment_offered == 0 or commitment_offered < margin:
             __incr_day__()
 
         else:

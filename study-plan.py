@@ -4,14 +4,7 @@ import datetime
 import os
 import pandas as pd
 
-
-class Config():
-    week2days = 7
-    mins2hours = 1.0/60.0
-    timezone_separator = ':'
-    date_range_separator = ':'
-    input_time_format = "%Y-%m-%d" + timezone_separator + "%z"
-    output_time_format = "%Y-%m-%d"
+from config import Config
 
 def parse_time(time_required:str):
 
@@ -163,7 +156,6 @@ def valid_date(s):
 
 def stamp_weekday(data):
     weekday = []
-    print(data.Date)
     for date_range in data.Date:
         dates = date_range.split(Config.date_range_separator)
         start_date = dates[0]

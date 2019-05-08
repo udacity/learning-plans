@@ -167,7 +167,7 @@ def stamp_weekday(data):
         out = start_weekday + ', ' + start_date
         if start_date != end_date:
             end_day = end_weekday + ',' + end_date
-            out += Config.date_range_separator + end_date
+            out += Config.date_range_separator + end_day
         
         weekday.append(out)
     data.Date = weekday
@@ -202,14 +202,9 @@ def run():
     if len(daily_commitment) == 1:
         daily_commitment = daily_commitment * Config.week2days
 
-    
     lesson_durations = to_hours(time_requirements, expected_weekly_hours)
-          
     timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
-    
-    d2l = timeline #d2l = date_to_lessons(timeline)
-    
-    output = compact_timeline(d2l)
+    output = compact_timeline(timeline)
     output = stamp_weekday(output)
     #print(output)
     

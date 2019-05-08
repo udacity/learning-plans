@@ -8,7 +8,9 @@ import pandas as pd
 class Config():
     week2days = 7
     mins2hours = 1.0/60.0
-    input_time_format = "%Y-%m-%d:%z"
+    timezone_separator = ':'
+    date_range_separator = ':'
+    input_time_format = "%Y-%m-%d" + timezone_separator + "%z"
     output_time_format = "%Y-%m-%d"
 
 def parse_time(time_required:str):
@@ -113,7 +115,7 @@ def compact_timeline(timeline):
         start_date = data.Date.iloc[0].strftime(Config.output_time_format)
         end_date = data.Date.iloc[-1].strftime(Config.output_time_format)
         if end_date != start_date:
-            return start_date + ':' + end_date
+            return start_date + Config.date_range_separator + end_date
         
         return start_date
 
@@ -157,8 +159,30 @@ def valid_date(s):
         msg = f"'{s}' is not a valid date in yyyy-mm-dd:hh:mm format."
         raise argparse.ArgumentTypeError(msg)
     return date
-                
 
+
+def stamp_weekday(data):
+    weekday = []
+    print(data.Date)
+    for date_range in data.Date:
+        dates = date_range.split(Config.date_range_separator)
+        start_date = dates[0]
+        end_date   = dates[-1]
+
+        start_weekday = datetime.datetime.strptime(start_date,Config.output_time_format).strftime('%A')
+        end_weekday   = datetime.datetime.strptime(end_date,Config.output_time_format).strftime('%A')
+
+        out = start_weekday + ', ' + start_date
+        if start_date != end_date:
+            end_day = end_weekday + ',' + end_date
+            out += Config.date_range_separator + end_date
+        
+        weekday.append(out)
+    data.Date = weekday
+
+    return data
+
+    
 
 def run():
     parser = argparse.ArgumentParser('study-plan.py')
@@ -194,6 +218,7 @@ def run():
     d2l = timeline #d2l = date_to_lessons(timeline)
     
     output = compact_timeline(d2l)
+    output = stamp_weekday(output)
     #print(output)
     
     dir = './plans'

@@ -1,7 +1,6 @@
 # coding: utf-8
 import argparse
 import datetime
-import numpy as np
 import os
 import pandas as pd
 
@@ -104,7 +103,7 @@ def compact_timeline(timeline):
         date_group = [0] * len(data)
         
         for i in range(1,len(data)):
-            if (data.Date[i] - data.Date[i-1]).days <= 1:
+            if (data.Date.iloc[i] - data.Date.iloc[i-1]).days <= 1:
                 date_group[i] = date_group[i-1]
             else:
                 date_group[i] = date_group[i-1]+1 
@@ -120,9 +119,11 @@ def compact_timeline(timeline):
 
     def __collapse_dates__(data):
         '''Convert sequential dates to a date range string.'''
+        # Convert to date ranges, wherever required
         date_groups = __collate_dates__(data) 
-        out = data.groupby(date_groups).apply(__to_date_range__)
 
+        # Group by date ranges, then drop group column(index).
+        out = data.groupby(date_groups).apply(__to_date_range__).reset_index(drop=True)
         return out
 
     def __collapse_lessons__(data):
@@ -130,13 +131,20 @@ def compact_timeline(timeline):
         lessons = ', '.join(list(data.Lessons))
         return lessons
         
-    timeline_by_lessons = timeline.groupby(timeline.Lessons, sort=False)\
-                                  .apply(__collapse_dates__)\
-                                  .reset_index(name='Date')
+    timeline_by_lessons = pd.DataFrame(timeline\
+        .groupby(timeline.Lessons, sort=False)\
+        .apply(__collapse_dates__)\
+        .reset_index('Lessons'))
     
-    timeline_by_dates = timeline_by_lessons.groupby(timeline_by_lessons.Date)\
-                                           .apply(__collapse_lessons__)\
-                                           .reset_index(name='Lessons')
+    timeline_by_lessons.columns = ['Lessons', 'Date']
+    
+    timeline_by_dates = pd.DataFrame(timeline_by_lessons\
+        .groupby(timeline_by_lessons.Date)\
+        .apply(__collapse_lessons__)\
+        .reset_index('Date'))
+    
+    timeline_by_dates.columns = ['Date','Lessons']
+    
     return timeline_by_dates
         
 
@@ -174,7 +182,7 @@ def run():
     assert len(daily_commitment) == 1 or len(daily_commitment) == 7, ("Parameter --daily must be either a single " 
     "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment.")
 
-    # Expand short-form. 
+    # If a single number is provided for commitment, expand it to a weekly list. 
     if len(daily_commitment) == 1:
         daily_commitment = daily_commitment * Config.week2days
 
@@ -186,7 +194,7 @@ def run():
     d2l = timeline #d2l = date_to_lessons(timeline)
     
     output = compact_timeline(d2l)
-    print(output)
+    #print(output)
     
     dir = './plans'
     if not os.path.exists(dir):

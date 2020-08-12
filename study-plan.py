@@ -16,7 +16,7 @@ def parse_time(time_required:str):
     time_spec = {'weeks':0, 'days':0, 'hours':0, 'mins':0}
     
     for i in range(0,len(tmp),2):
-        time = int(tmp[i])
+        time = float(tmp[i])
         unit = tmp[i+1]
         
         assert time >=0, print('Invalid value for time',time) 

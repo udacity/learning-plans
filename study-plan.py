@@ -193,23 +193,33 @@ def __parse_cmd_line_args__():
     parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD:<UTC Offset as +/-hhmm>.")
     parser.add_argument('--daily',type=float, nargs='+', help=("Either a single " 
     "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment."))
-    
+    parser.add_argument('--single_week',
+    action='store_true', 
+    help='If present, generate plan for one week only otherwise generate full plan.')
+    parser.add_argument('--no_csv', 
+    action='store_true', 
+    help='Default:false. If true write output to ')
+
     args = parser.parse_args()
     
     duration = args.duration
     expected_weekly_hours = args.expected
     start_date = args.start
     daily_commitment = args.daily
+    single_week = args.single_week
+    output_csv = not args.no_csv
 
     return {'duration':duration, 
     'expected_weekly_hours':expected_weekly_hours,
     'start_date': args.start,
-    'daily_commitment':daily_commitment
+    'daily_commitment':daily_commitment,
+    'single_week':single_week,
+    'output_csv':output_csv
     }
     
     
 
-def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list, single_week=False, output_csv=True):
+def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list, single_week=False):
     
     # Read in the duration data and parse time field. 
     if isinstance(duration,str):
@@ -229,27 +239,44 @@ def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list
     if len(daily_commitment) == 1:
         daily_commitment = daily_commitment * Config.week2days
 
+    # If caller hasn't bothered to convert string to date object.
     if isinstance(start_date, str):
         start_date = valid_date(start_date)
 
     lesson_durations = to_hours(time_requirements, expected_weekly_hours)
     timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
+    
+    if single_week:
+        day_1 = timeline.Date[0]
+        day_7 = day_1 + datetime.timedelta(days=7)
+        timeline = timeline[timeline.Date <= day_7] 
+    
     output = compact_timeline(timeline)
     output = stamp_weekday(output)
-    #print(output)
-    
-    if output_csv:
-        dir = './plans'
-        if not os.path.exists(dir):
-            os.mkdir(dir)
-        
-        filename = os.path.basename(duration).split('.')[0]
-        out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
-        output.to_csv(out_path, sep=',', index=False)
-        print(f'File {out_path} written.')
     
     return output 
 
+
+def __dump_csv__(data, duration_file_path:str, daily_commitment:str):
+
+    dir = './plans'
+    if not os.path.exists(dir):
+        os.mkdir(dir)
+    
+    filename = os.path.basename(duration_file_path).split('.')[0]
+    out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
+    output.to_csv(out_path, sep=',', index=False)
+    print(f'File {out_path} written.')
+
+
+
 if __name__ == '__main__':
     args = __parse_cmd_line_args__()
-    run(**args)
+    output = run(**args) 
+    
+    if args['output_csv']:
+        __dump_csv__(output,  args['duration'], args['daily_commitment'])
+            
+    else:
+        print(output)
+        

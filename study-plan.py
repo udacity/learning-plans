@@ -7,6 +7,12 @@ import pandas as pd
 from config import Config
 
 def parse_time(time_required:str):
+    """Convert a flexible timestring to a standard representation.
+    @Param time_required: String containing a mix of numbers and units, perhaps 
+    abbreviated, representing a duration. For example 2 weeks 3 days 5 hours 15 minutes. 
+    Every number should be followed by a unit. See the code for possible units and their 
+    abbreviations. The string should use only whitespaces as separators.
+    """
 
     time_required = time_required.strip(' \t')
     tmp = time_required.split(' ')
@@ -36,6 +42,9 @@ def parse_time(time_required:str):
 
 
 def to_hours(time_needed, expected_weekly_hours):
+    """Convert a time spec dictionary to a scalar number by converting all 
+    sections of the timespec to hours.
+    """
     hours_required = [0]*len(time_needed)
     for i in range(len(time_needed)):
         hours_required[i] = time_needed[i]['weeks'] * expected_weekly_hours +\
@@ -149,7 +158,7 @@ def valid_date(s):
     try:
         date = datetime.datetime.strptime(s, Config.input_time_format)
     except ValueError:
-        msg = f"'{s}' is not a valid date in yyyy-mm-dd:hh:mm format."
+        msg = f"'{s}' is not a valid date in {Config.input_time_format} format."
         raise argparse.ArgumentTypeError(msg)
     return date
 
@@ -174,21 +183,32 @@ def stamp_weekday(data):
 
     return data
 
-    
 
-def run():
+
+def __parse_cmd_line_args__():
     parser = argparse.ArgumentParser('study-plan.py')
     parser.add_argument('--duration',type=str, help='Path to CSV file containing lesson-wise durations.')
     parser.add_argument('--expected',type=float, help='Expected commitment in hours per week.')
-    parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD:<UTC Offset as +/-hh:mm>.")
+    parser.add_argument('--start',type=valid_date, help="Classroom open date - format YYYY-MM-DD:<UTC Offset as +/-hhmm>.")
     parser.add_argument('--daily',type=float, nargs='+', help=("Either a single " 
     "number for the daily commitment in hours or a list of seven numbers for each weekday's commitment."))
     
     args = parser.parse_args()
+    
     duration = args.duration
     expected_weekly_hours = args.expected
     start_date = args.start
     daily_commitment = args.daily
+
+    return {'duration':duration, 
+    'expected_weekly_hours':expected_weekly_hours,
+    'start_date': args.start,
+    'daily_commitment':daily_commitment
+    }
+    
+    
+
+def run(duration, expected_weekly_hours, start_date, daily_commitment):
     
     # Read in the duration data and parse time field. 
     data = pd.read_csv(duration, header=0)
@@ -219,4 +239,5 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    args = __parse_cmd_line_args__()
+    run(**args)

@@ -219,7 +219,7 @@ def __parse_cmd_line_args__():
     
     
 
-def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list, single_week=False):
+def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list, single_week=False, **kwargs):
     
     # Read in the duration data and parse time field. 
     if isinstance(duration,str):
@@ -246,15 +246,19 @@ def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list
     lesson_durations = to_hours(time_requirements, expected_weekly_hours)
     timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
     
+    ## This must be calculated based on the full timeline.
+    days_to_finish = timeline.Date.iloc[-1] - timeline.Date.iloc[0] + datetime.timedelta(days=1)
+    
     if single_week:
         day_1 = timeline.Date[0]
         day_7 = day_1 + datetime.timedelta(days=7)
         timeline = timeline[timeline.Date <= day_7] 
     
+     
     output = compact_timeline(timeline)
     output = stamp_weekday(output)
     
-    return output 
+    return output, days_to_finish 
 
 
 def __dump_csv__(data, duration_file_path:str, daily_commitment:str):
@@ -272,8 +276,9 @@ def __dump_csv__(data, duration_file_path:str, daily_commitment:str):
 
 if __name__ == '__main__':
     args = __parse_cmd_line_args__()
-    output = run(**args) 
-    
+
+    output, days_to_finish = run(**args) 
+    print(f"Days to graduate on this program: {days_to_finish}.")
     if args['output_csv']:
         __dump_csv__(output,  args['duration'], args['daily_commitment'])
             

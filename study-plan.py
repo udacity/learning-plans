@@ -3,6 +3,7 @@ import argparse
 import datetime
 import os
 import pandas as pd
+from typing import List
 
 from config import Config
 
@@ -208,10 +209,16 @@ def __parse_cmd_line_args__():
     
     
 
-def run(duration, expected_weekly_hours, start_date, daily_commitment):
+def run(duration, expected_weekly_hours:float, start_date, daily_commitment:list, single_week=False, output_csv=True):
     
     # Read in the duration data and parse time field. 
-    data = pd.read_csv(duration, header=0)
+    if isinstance(duration,str):
+        data = pd.read_csv(duration, header=0)
+    else:
+        assert isinstance(duration, pd.DataFrame), print('First argument to run'+
+        'should either be the path to a CSV or a Pandas DataFrame object containing lesson durations')
+        data = duration
+        
     time_requirements = list(map(parse_time, data.Duration))
 
     # Sanity check learner's daily commitment.
@@ -222,21 +229,26 @@ def run(duration, expected_weekly_hours, start_date, daily_commitment):
     if len(daily_commitment) == 1:
         daily_commitment = daily_commitment * Config.week2days
 
+    if isinstance(start_date, str):
+        start_date = valid_date(start_date)
+
     lesson_durations = to_hours(time_requirements, expected_weekly_hours)
     timeline = build_timeline(data, lesson_durations, daily_commitment, start_date)
     output = compact_timeline(timeline)
     output = stamp_weekday(output)
     #print(output)
     
-    dir = './plans'
-    if not os.path.exists(dir):
-        os.mkdir(dir)
+    if output_csv:
+        dir = './plans'
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        
+        filename = os.path.basename(duration).split('.')[0]
+        out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
+        output.to_csv(out_path, sep=',', index=False)
+        print(f'File {out_path} written.')
     
-    filename = os.path.basename(duration).split('.')[0]
-    out_path = dir + '/' + filename + '_' + str(daily_commitment) + '.csv'
-    output.to_csv(out_path, sep=',', index=False)
-    print(f'File {out_path} written.')
-
+    return output 
 
 if __name__ == '__main__':
     args = __parse_cmd_line_args__()

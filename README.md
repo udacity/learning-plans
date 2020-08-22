@@ -18,8 +18,8 @@ It takes a number of mandatory arguments. The arguments are described below. You
 ```python study-plan.py --help```
 
 ```
-usage: study-plan.py [-h] [--duration DURATION] [--expected EXPECTED]
-                     [--start START] [--daily DAILY [DAILY ...]]
+usage: study-plan.py -h --duration DURATION --expected EXPECTED
+                     --start START --daily DAILY [DAILY ...] [--single_week] [--no_csv] 
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -31,6 +31,8 @@ optional arguments:
                         Either a single number for the daily commitment in
                         hours or a list of seven numbers for each weekday's
                         commitment.
+  --single_week         Output plan for the next 7 days, starting on `start`
+  --no_csv              Do not create output file. Dump output to terminal instead. Useful for debugging. 
 ```
 Here are the arguments in lexicographic order along with their parameters: 
 

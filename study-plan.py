@@ -10,7 +10,7 @@ from config import Config
 def parse_time(time_required:str):
     """Convert a flexible timestring to a standard representation.
     @Param time_required: String containing a mix of numbers and units, perhaps 
-    abbreviated, representing a duration. For example 2 weeks 3 days 5 hours 15 minutes. 
+    abbreviated, representing a duration. For example "2 weeks 3 days 5 hours 15 minutes". 
     Every number should be followed by a unit. See the code for possible units and their 
     abbreviations. The string should use only whitespaces as separators.
     """
@@ -86,12 +86,12 @@ def build_timeline(data, lesson_duration, commitment_by_day, start_date, margin=
 
         else:
             if commitment_offered >= commitment_required:
-                lesson_timeline.append((commitment_info['date'], data.Lesson[lesson_info['id']]))
+                lesson_timeline.append((commitment_info['date'], data.Lesson.iloc[lesson_info['id']]))
                 __incr_lesson__()
                 commitment_info['nb_hours'] = commitment_offered - commitment_required
 
             else:
-                lesson_timeline.append((commitment_info['date'], data.Lesson[lesson_info['id']]))
+                lesson_timeline.append((commitment_info['date'], data.Lesson.iloc[lesson_info['id']]))
                 __incr_day__()
                 lesson_info['nb_hours'] = commitment_required - commitment_offered
 
